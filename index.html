@@ -1,2 +1,35 @@
-<h1>Hello world</h1>
-<p>This is a free website.</p>
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Simple Poll</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 40px;
+      }
+      .poll {
+        max-width: 400px;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      }
+      button {
+        margin-top: 15px;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="poll">
+      <h2>Which option do you prefer?</h2>
+      <label><input type="radio" name="poll"> Option 1</label><br>
+      <label><input type="radio" name="poll"> Option 2</label><br>
+      <button onclick="alert('Thanks for voting!')">Submit</button>
+    </div>
+  </body>
+</html>
