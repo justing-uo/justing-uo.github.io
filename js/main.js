@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const PIECE_THEME = 'https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/img/chesspieces/wikipedia/{piece}.png';
+  const PIECE_THEME = 'https://unpkg.com{piece}.png';
 
   const STRENGTH = {
     1: { maxDepth: 3, timeLimitMs: 1200, label: 'Casual' },
