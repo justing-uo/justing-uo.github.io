@@ -6,9 +6,9 @@ importScripts('engine-core.js');
 const searcher = ChessEngine.makeSearcher();
 
 self.onmessage = function (e) {
-  const { fen, maxDepth, timeLimitMs, requestId } = e.data;
+  const { history, maxDepth, timeLimitMs, requestId } = e.data;
   const started = Date.now();
-  const result = searcher.findBestMove(fen, { maxDepth, timeLimitMs });
+  const result = searcher.findBestMove({ history, maxDepth, timeLimitMs });
   self.postMessage({
     requestId,
     move: result.move,
