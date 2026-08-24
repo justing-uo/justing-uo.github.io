@@ -298,17 +298,47 @@
       for (let i = 0; i < ordered.length; i++) {
         const move = ordered[i];
         game.move(move.san);
-
+      
         let score;
+      
         if (i === 0) {
+          // Full-depth search for the first move.
           score = -negamax(game, depth - 1, -beta, -alpha, ply + 1);
+      
         } else {
-          score = -negamax(game, depth - 1, -alpha - 1, -alpha, ply + 1);
-          if (alpha < score && score < beta) {
-            score = -negamax(game, depth - 1, -beta, -alpha, ply + 1);
+          // Late Move Reduction:
+          // Search quiet late moves 2 plies shallower.
+          const lmr =
+            i >= 3 &&
+            depth >= 3 &&
+            !inCheck &&
+            !move.captured &&
+            !move.promotion;
+      
+          const searchDepth = depth - 1 - (lmr ? 2 : 0);
+      
+          // PVS null-window search.
+          score = -negamax(
+            game,
+            searchDepth,
+            -alpha - 1,
+            -alpha,
+            ply + 1
+          );
+      
+          // Re-search at normal depth if the reduced search
+          // suggests the move could improve alpha.
+          if (score > alpha) {
+            score = -negamax(
+              game,
+              depth - 1,
+              -beta,
+              -alpha,
+              ply + 1
+            );
           }
         }
-
+      
         game.undo();
 
         if (aborted) return 0;
