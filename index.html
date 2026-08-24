@@ -1,0 +1,2471 @@
+<!DOCTYPE html>
+<html>
+<body>
+<div id="deck-builder">
+  <h3>Choose 8 Cards</h3>
+  <div id="card-pool"></div>
+  <p id="deck-count">0 / 8</p>
+  <button id="start-game" disabled>Start Game</button>
+  <button id="start-ai">Watch Top Game</button>
+</div>
+
+<div id="scoreboard">
+  Wins: <span id="wins">0</span> |
+  Losses: <span id="losses">0</span>
+</div>
+
+<style>
+  #scoreboard {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 8px;
+    z-index: 10;
+  }
+
+  #arena {
+    display: block;
+    margin: 50px auto 0 auto; /* space so scoreboard doesn't overlap */
+  }
+</style>
+
+<canvas id="arena" width="400" height="1000"></canvas>
+
+<canvas id="arena" width="400" height="1000" style="border:0px solid black;"></canvas>
+
+<div id="end-overlay" style="display:none;">
+  <div id="end-box">
+    <h1 id="end-title"></h1>
+    <button id="end-button">OK</button>
+  </div>
+</div>
+
+<style>
+  #end-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+
+  #end-box {
+    background: #111;
+    color: white;
+    padding: 30px 40px;
+    border-radius: 12px;
+    text-align: center;
+    font-family: Arial, sans-serif;
+  }
+
+  #end-box h1 {
+    margin-bottom: 20px;
+    font-size: 32px;
+  }
+
+  #end-box button {
+    padding: 8px 18px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+</style>
+
+  
+<script>
+//Coming: goblin gang, graveyard, rocket, berzerker, night witch, lavahound, mega minion, ice golem, delivery, rascals, firecracker, royal hogs, furnace, royal giant, golem, recruits
+let gameMode = "PVP"; 
+
+document.getElementById("start-ai").onclick = () => {
+  gameMode = "AI_VS_AI";
+  const randomDecks = randomEnemyDeck(16);
+  enemyDeck = randomDecks.slice(0,8);
+  playerDeck = randomDecks.slice(8,16);
+  startGame(playerDeck);
+};
+  
+let gameStarted = false;
+let frameClock = 0;
+
+const PlacementType = {
+  PLAYER_SIDE_ONLY: "player",
+  ANYWHERE: "anywhere"
+};
+  
+const cards = [
+  { id: "archers", name: "Archers", cost: 3, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "arrows", name: "Arrows", cost: 3, placement: PlacementType.ANYWHERE, type: "spell", radius: 70, damage: 366, delay: 25, wins: 0, losses: 0 }, //(25, inf)
+  { id: "baby_dragon", name: "Baby Dragon", cost: 4, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "balloon", name: "Balloon", cost: 5, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "barbarians", name: "Barbarians", cost: 5, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "bats", name: "Bats", cost: 2, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "bomber", name: "Bomber", cost: 2, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "cannon", name: "Cannon", cost: 3, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "fire_spirit", name: "Fire Spirit", cost: 1, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "fireball", name: "Fireball", cost: 4, placement: PlacementType.ANYWHERE, type: "spell", radius: 60, damage: 688, delay: 55, wins: 0, losses: 0 },
+  { id: "giant", name: "Giant", cost: 5, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "goblins", name: "Goblins", cost: 2, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "goblin_gang", name: "Goblin Gang", cost: 3, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "hog_rider", name: "Hog Rider", cost: 4, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "knight", name: "Knight", cost: 3, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "mini_pekka", name: "Mini Pekka", cost: 4, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "minion_horde", name: "Minion Horde", cost: 5, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "minions", name: "Minions", cost: 3, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "musketeer", name: "Musketeer", cost: 4, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "pekka", name: "Pekka", cost: 7, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "skeleton_army", name: "Skeleton Army", cost: 3, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "skeleton_dragons", name: "Skeleton Dragons", cost: 4, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "skeletons", name: "Skeletons", cost: 1, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "spear_goblins", name: "Spear Goblins", cost: 2, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "three_musketeers", name: "Three Musketeers", cost: 9, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "tombstone", name: "Tombstone", cost: 3, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "valkyrie", name: "Valkyrie", cost: 4, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "wallbreakers", name: "Wallbreakers", cost: 2, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "witch", name: "Witch", cost: 5, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "wizard", name: "Wizard", cost: 5, placement: PlacementType.PLAYER_SIDE_ONLY, wins: 0, losses: 0 },
+  { id: "zap", name: "Zap", cost: 2, placement: PlacementType.ANYWHERE, type: "spell", radius: 60, damage: 192, delay: 1, wins: 0, losses: 0 }
+];
+  
+// Persistent card stats (never reset)
+const cardStats = {};
+for (const card of cards) {
+  cardStats[card.id] = {
+    name: card.name,
+    wins: 0,
+    losses: 0,
+    games: 0
+  };
+}
+  
+const cardPoolDiv = document.getElementById("card-pool");
+const deckCount = document.getElementById("deck-count");
+const startButton = document.getElementById("start-game");
+
+function renderCardPool() {
+  cardPoolDiv.innerHTML = "";
+
+  for (const card of cards) {
+    const btn = document.createElement("button");
+    btn.textContent = card.name;
+    btn.style.margin = "4px";
+
+    btn.onclick = () => toggleCard(cards.indexOf(card), btn);
+    cardPoolDiv.appendChild(btn);
+  }
+}
+
+let wins = 0;
+let losses = 0;
+
+function updateScoreboard() {
+  document.getElementById("wins").textContent = wins;
+  document.getElementById("losses").textContent = losses;
+}
+
+renderCardPool();
+
+function toggleCard(cardId, button) {
+  const index = playerDeck.indexOf(cardId);
+
+  if (index !== -1) {
+    // Remove
+    playerDeck.splice(index, 1);
+    button.style.background = "";
+  } else {
+    if (playerDeck.length >= MAX_DECK_SIZE) return;
+    playerDeck.push(cardId);
+    button.style.background = "lightgreen";
+  }
+
+  deckCount.textContent = `${playerDeck.length} / 8`;
+  startButton.disabled = playerDeck.length !== MAX_DECK_SIZE;
+}
+
+startButton.onclick = () => {
+  startGame(playerDeck);
+};
+
+function startGame(deck) {
+  initTowers();
+  frameClock = 0;
+  
+  const playerState = initializeDeck(deck);
+  playerHand = playerState.hand;
+  playerDeck = playerState.deck;
+  playerData = playerState.shuffled; // ← array of indices
+
+  const enemyState = initializeDeck(enemyDeck);
+  enemyHand = enemyState.hand;
+  enemyDeck = enemyState.deck;
+  enemyData = enemyState.shuffled; // ← array of indices
+
+  playerElixir = 7;
+  enemyElixir = 7;
+  timeLeft = 180;
+
+  document.getElementById("deck-builder").style.display = "none";
+
+  if (!gameStarted) {
+    drawArena();
+    if (gameMode === "AI_VS_AI") {
+      for (i = 1; i < 99; i++) {
+        drawArena();
+      }
+    }
+  }
+
+  gameStarted = true;
+}
+  
+let timeLeft = 180; // 3 minutes in seconds
+const canvas = document.getElementById("arena");
+const ctx = canvas.getContext("2d");
+const units = [];
+const bridges = [
+  { x: 75, y: 300 },  // middle of first bridge
+  { x: 325, y: 300 },  // middle of second bridge
+];
+const RIVER_TOP = 275;
+const RIVER_BOTTOM = 325;
+
+// Player elixir values
+let playerElixir = 6;
+let enemyElixir = 6;
+const maxElixir = 10;
+const effects = [];
+const pendingSpells = [];
+  
+playerDeck = [];
+const MAX_DECK_SIZE = 8;
+function randomEnemyDeck(size = 8) {
+  const indices = cards.map((_, i) => i); // [0,1,2,...]
+  
+  // Shuffle
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+
+  return indices.slice(0, size);
+}
+
+enemyDeck = randomEnemyDeck(8);
+  
+// Create a fresh shuffled deck for the player
+function initializeDeck(deckArray) {
+  const shuffled = [...deckArray].sort(() => Math.random() - 0.5);
+  const hand = shuffled.slice(0, 4);       // first 4 go to hand
+  const deck = shuffled.slice(4);          // rest stay in deck
+  return { hand, deck, shuffled };
+}
+
+function cycleCard(handArray, deckArray, handIndex) {
+  const playedCard = handArray.splice(handIndex, 1)[0]; // remove from hand
+
+  // draw the next card from the deck
+  const nextCard = deckArray.shift();
+  handArray.push(nextCard);
+
+  // put the played card at the bottom of the deck
+  deckArray.push(playedCard);
+}
+
+const cardAI = {
+  knight: {
+    reactiveOffset: { x: 0, y: -25 }, // spawn below enemy troop
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  archers: {
+    reactivePos: { x: 200, y: 140 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  musketeer: {
+    reactiveOffset: { x: 100, y: -160 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  three_musketeers: {
+    reactiveOffset: { x: 100, y: -160 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  giant: {
+    reactiveOffset: { x: 150, y: -50 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  mini_pekka: {
+    reactiveOffset: { x: 0, y: -25 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  minions: {
+    reactiveOffset: { x: 0, y: -50 },
+    investPos1: { x: 50, y: 0 },
+    investPos2: { x: 350, y: 0 }
+  },
+  fireball: {
+    reactiveOffset: { x: 0, y: 0 },
+  },
+  arrows: {
+    reactiveOffset: { x: 0, y: 0 },
+  },
+  skeletons: {
+    reactiveOffset: { x: 0, y: 0 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  goblins: {
+    reactiveOffset: { x: 0, y: 0 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  spear_goblins: {
+    reactiveOffset: { x: 75, y: -130 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  skeleton_army: {
+    reactiveOffset: { x: 0, y: 0 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  cannon: {
+    reactivePos: { x: 200, y: 190 }
+  },
+  tombstone: {
+    reactivePos: { x: 200, y: 190 }
+  },
+  hog_rider: {
+    investPos1: { x: 0, y: 274 },
+    investPos2: { x: 400, y: 274 }
+  },
+  balloon: {
+    investPos1: { x: 0, y: 274 },
+    investPos2: { x: 400, y: 274 }
+  },
+  wizard: {
+    reactiveOffset: { x: 100, y: -145 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  baby_dragon: {
+    reactiveOffset: { x: 50, y: -100 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  skeleton_dragons: {
+    reactiveOffset: { x: 50, y: -100 },
+    investPos1: { x: 200, y: 0 },
+    investPos2: { x: 200, y: 0 }
+  },
+  minion_horde: {
+    reactiveOffset: { x: 0, y: 0 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  goblin_gang:  {
+    reactiveOffset: { x: 75, y: -130 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  pekka: {
+    reactiveOffset: { x: 0, y: -25 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  }, 
+  zap: {
+    reactiveOffset: { x: 0, y: 0 }
+  },
+  fire_spirit: {
+    reactivePos: { x: 200, y: 200 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  witch: {
+    reactiveOffset: { x: 100, y: -145 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  barbarians: {
+    reactiveOffset: { x: 0, y: 0 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  bomber: {
+    reactiveOffset: { x: 50, y: -100 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  wallbreakers: {
+    reactivePos: { x: 200, y: 270 },
+    investPos1: { x: 75, y: 270 },
+    investPos2: { x: 325, y: 270 }
+  }, 
+  bats: {
+    reactiveOffset: { x: 0, y: 0 },
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  valkyrie: {
+    reactiveOffset: { x: 0, y: -25 }, // spawn below enemy troop
+    investPos1: { x: 199, y: 0 },
+    investPos2: { x: 201, y: 0 }
+  },
+  };
+
+const SPELL_UNIT_VALUES = {
+  Fireball: {
+    Knight: 1,
+    Archer: 1.5,
+    Musketeer: 2,
+    "Baby Musketeer": 2.5,
+    Giant: 0.5,
+    Minion: 1,
+    "Mini Pekka": 1,
+    Skeleton: 0.25,
+    Cannon: 1.5,
+    Goblin: 0.5,
+    "Spear Goblin": 0.5,
+    Tombstone: 1.5,
+    "Hog Rider": 1,
+    Balloon: 2,
+    Wizard: 2.5,
+    "Baby Dragon": 1,
+    "Skeleton Dragon": 2,
+    Pekka: 0.5,
+    "Fire Spirit": 1,
+    Witch: 2.5,
+    Barbarian: 1,
+    Bomber: 2,
+    Wallbreaker: 1,
+    Bat: 0.4,
+    Valkyrie: 1.25,
+
+    tower: 2,
+    kingTower: -5
+  },
+
+  Arrows: {
+    Knight: 0.5,
+    Archer: 1.5,
+    Musketeer: 1,
+    "Baby Musketeer": 2.5,
+    Giant: 0.25,
+    Minion: 1,
+    "Mini Pekka": 0.5,
+    Skeleton: 0.25,
+    Cannon: 0.75,
+    Goblin: 0.5,
+    "Spear Goblin": 0.5,
+    Tombstone: 0.75,
+    "Hog Rider": 0.5,
+    Balloon: 1,
+    Wizard: 1.25,
+    "Baby Dragon": 0.5,
+    "Skeleton Dragon": 1,
+    Pekka: 0.25,
+    "Fire Spirit": 1,
+    Witch: 1.25,    
+    Barbarian: 0.25,
+    Bomber: 2,
+    Wallbreaker: 1,
+    Bat: 0.4,
+    Valkyrie: 0.5,
+
+    tower: 1,
+    kingTower: -5
+  },
+
+  Zap: {
+    Knight: 0.25,
+    Archer: 0.5,
+    Musketeer: 0.5,
+    "Baby Musketeer": 0.5,
+    Giant: 0.25,
+    Minion: 0.25,
+    "Mini Pekka": 0.25,
+    Skeleton: 0.25,
+    Cannon: 0.25,
+    Goblin: 0.25,
+    "Spear Goblin": 0.5,
+    Tombstone: 0.25,
+    "Hog Rider": 0.25,
+    Balloon: 0.5,
+    Wizard: 0.75,
+    "Baby Dragon": 0.25,
+    "Skeleton Dragon": 0.5,
+    Pekka: 0.25,
+    "Fire Spirit": 0,
+    Witch: 0.75,
+    Barbarian: 0,
+    Bomber: 0.5,
+    Wallbreaker: 0.5,
+    Bat: 0.4,
+    Valkyrie: 0.25,
+    
+    tower: 0.5,
+    kingTower: -5
+  },
+};
+  
+// Card selected variables
+let selectedCardIndex = null; // 0–3, or null if none selected
+const handCards = [];
+const ARENA_HEIGHT = 600;
+
+const ATTACK_RANGE = 20;
+const ATTACK_DAMAGE = 170;
+const ATTACK_COOLDOWN = 60; // frames (~1 second at 60fps)
+
+function sameSide(a, b) {
+  if (!a || !b) return false;
+  // both above river
+  if (a.y < RIVER_BOTTOM && b.y < RIVER_BOTTOM) return true;
+  // both below river
+  if (a.y > RIVER_TOP && b.y > RIVER_TOP) return true;
+  return false;
+}
+
+function sideHasPocket(team, side) {
+  const towers = team === "player" ? enemyTowers : playerTowers;
+  const midX = canvas.width / 2;
+
+  return !towers.some(t =>
+    !t.isKing &&
+    (side === "left" ? t.x < midX : t.x > midX)
+  );
+}
+
+function isInPocket(x, y, team) {
+  const midX = canvas.width / 2;
+  const pocketDepth = 75;
+
+  // Which side of arena?
+  const side = x < midX ? "left" : "right";
+
+  if (!sideHasPocket(team, side)) return false;
+
+  // Pocket Y range depends on team
+  if (team === "player") {
+    return y < RIVER_TOP && y >= RIVER_TOP - pocketDepth;
+  } else {
+    return y > RIVER_BOTTOM && y <= RIVER_BOTTOM + pocketDepth;
+  }
+}
+
+function canPlaceCard(card, x, y, team) {
+  // River is always blocked
+  if (y >= RIVER_TOP && y <= RIVER_BOTTOM) return false;
+
+  if (card.placement === PlacementType.PLAYER_SIDE_ONLY) {
+
+    // Normal side restriction
+    if (team === "player" && y < RIVER_BOTTOM) {
+      if (!isInPocket(x, y, team)) return false;
+    }
+
+    if (team === "enemy" && y > RIVER_TOP) {
+      if (!isInPocket(x, y, team)) return false;
+    }
+  }
+
+  return true;
+}
+
+function furthestEnemyOnOurSide(team) {
+  const candidates = units.filter(u => {
+    if (u.team === team) return false;
+    return team === "enemy" ? u.y < RIVER_TOP - 5 : u.y > RIVER_BOTTOM + 5;
+  });
+
+  if (candidates.length === 0) return null;
+
+  return candidates.reduce((a, b) =>
+    distanceToEnemySide(a, team) > distanceToEnemySide(b, team) ? a : b
+  );
+}
+
+function distanceToEnemySide(unit, team) {
+  return team === "enemy" ? unit.y : canvas.height - unit.y;
+}
+
+function spellUnitValue(card, target) {
+  const table = SPELL_UNIT_VALUES[card.name];
+  if (!table) return 0;
+
+  if (target instanceof Tower) {
+    return target.isKing
+      ? table.kingTower ?? 0
+      : table.tower ?? 0;
+  }
+
+  return table[target.type] ?? 0;
+}
+
+function bestSpellTarget(card, team) {
+  let bestTarget = null;
+  let bestValue = 0;
+
+  const enemies = [
+    ...units.filter(u => u.team !== team),
+    ...(team === "player" ? enemyTowers : playerTowers)
+  ];
+
+  for (const candidate of enemies) {
+    let value = 0;
+
+    for (const e of enemies) {
+      if (distance(candidate, e) <= card.radius) {
+        value += spellUnitValue(card, e);
+      }
+    }
+
+    if (value > bestValue) {
+      bestValue = value;
+      bestTarget = candidate;
+    }
+  }
+
+  return bestValue > card.cost ? bestTarget : null;
+}
+
+function resolveAIPlacement(card, team) {
+  const ai = cardAI[card.id];
+
+  const myElixir  = team === "enemy" ? enemyElixir : playerElixir;
+  const oppElixir = team === "enemy" ? playerElixir : enemyElixir;
+
+  const dir = team === "enemy" ? 1 : -1; // only for offsets
+
+  const threat = card.type === "spell"
+    ? bestSpellTarget(card, team)
+    : furthestEnemyOnOurSide(team);
+
+  // Reactive offset
+  if (threat && ai?.reactiveOffset && (myElixir - oppElixir - card.cost > -4 || myElixir == 10)) {
+    return {
+      x: threat.x > 200 ? threat.x - ai.reactiveOffset.x : threat.x + ai.reactiveOffset.x,
+      y: threat.y + ai.reactiveOffset.y * dir // flip only the offset
+    };
+  }
+
+  // Reactive position
+  if (threat && ai?.reactivePos && (myElixir - oppElixir - card.cost > -4 || myElixir == 10)) {
+    return {
+      x: ai.reactivePos.x,
+      y: team === "player" ? 600 - ai.reactivePos.y : ai.reactivePos.y
+    };
+  }
+
+  // Investment positions
+  if (!threat && ai?.investPos1 && myElixir >= 9) {
+    const pos = Math.random() > 0.5 ? ai.investPos1 : ai.investPos2;
+    return {
+      x: pos.x,
+      y: team === "player" ? 600 - pos.y : pos.y
+    };
+  }
+
+  return null;
+}
+
+function aiPlayCard(team, hand, deck) {
+  const elixir = team === "player" ? playerElixir : enemyElixir;
+
+  const playable = hand
+    .map(i => cards[i])
+    .filter(c => elixir >= c.cost);
+
+  if (playable.length === 0) return;
+
+  const card = playable[Math.floor(Math.random() * playable.length)];
+  const cardIndex = cards.indexOf(card);
+  const handIndex = hand.indexOf(cardIndex);
+  if (handIndex === -1) return;
+
+  const pos = resolveAIPlacement(card, team);
+  if (!pos) return;
+
+  // SPELLS always succeed
+  if (card.type === "spell") {
+    if (team === "player") playerElixir -= card.cost;
+    else enemyElixir -= card.cost;
+
+    castSpell(card, pos.x, pos.y, team);
+    cycleCard(hand, deck, handIndex);
+    return;
+  }
+
+  // UNITS must pass placement check
+  if (!canPlaceCard(card, pos.x, pos.y, team)) {
+    return; // 🚫 do nothing
+  }
+
+  // Now commit
+  if (team === "player") playerElixir -= card.cost;
+  else enemyElixir -= card.cost;
+
+  team === "enemy"
+    ? spawnEnemyUnit(card, pos.x, pos.y)
+    : spawnPlayerUnit(card, pos.x, pos.y);
+
+  cycleCard(hand, deck, handIndex);
+}
+  
+function spawnEnemyUnit(card, x, y) {
+  if (card.name === "Knight") {
+    units.push(new Unit(x, y, "enemy", "Knight"));
+  } 
+  else if (card.name === "Valkyrie") {
+    units.push(new Unit(x, y, "enemy", "Valkyrie"));
+  } 
+  else if (card.name === "Archers") {
+    units.push(new Unit(x - 15, y, "enemy", "Archer"));
+    units.push(new Unit(x + 15, y, "enemy", "Archer"));
+  } 
+  else if (card.name === "Musketeer") {
+    units.push(new Unit(x, y, "enemy", "Musketeer"));
+  } 
+  else if (card.name === "Three Musketeers") {
+    units.push(new Unit(x - 30, y - 20, "enemy", "Baby Musketeer"));
+    units.push(new Unit(x + 30, y - 20, "enemy", "Baby Musketeer"));
+    units.push(new Unit(x, y + 30, "enemy", "Musketeer"));
+  } 
+  else if (card.name === "Giant") {
+    units.push(new Unit(x, y, "enemy", "Giant"));
+  }
+  else if (card.name === "Minions") {
+    units.push(new Unit(x - 15, y - 10, "enemy", "Minion"));
+    units.push(new Unit(x + 15, y - 10, "enemy", "Minion"));
+    units.push(new Unit(x, y + 15, "enemy", "Minion"));
+  }
+  else if (card.name === "Mini Pekka") {
+    units.push(new Unit(x, y, "enemy", "Mini Pekka"));
+  } 
+  else if (card.name === "Skeletons") {
+    units.push(new Unit(x - 15, y - 10, "enemy", "Skeleton"));
+    units.push(new Unit(x + 15, y - 10, "enemy", "Skeleton"));
+    units.push(new Unit(x, y + 15, "enemy", "Skeleton"));
+  }
+  else if (card.name === "Goblins") {
+    units.push(new Unit(x - 15, y - 15, "enemy", "Goblin"));
+    units.push(new Unit(x + 15, y - 15, "enemy", "Goblin"));
+    units.push(new Unit(x - 15, y + 15, "enemy", "Goblin"));
+    units.push(new Unit(x + 15, y + 15, "enemy", "Goblin"));
+  }
+  else if (card.name === "Spear Goblins") {
+    units.push(new Unit(x - 15, y - 15, "enemy", "Spear Goblin"));
+    units.push(new Unit(x - 15, y + 15, "enemy", "Spear Goblin"));
+    units.push(new Unit(x, y + 15, "enemy", "Spear Goblin"));
+  }
+  else if (card.name === "Skeleton Army") {
+    units.push(new Unit(x - 30, y - 30, "enemy", "Skeleton"));
+    units.push(new Unit(x - 30, y - 10, "enemy", "Skeleton"));
+    units.push(new Unit(x - 30, y + 10, "enemy", "Skeleton"));
+    units.push(new Unit(x - 20, y + 30, "enemy", "Skeleton"));
+    units.push(new Unit(x - 10, y - 30, "enemy", "Skeleton"));
+    units.push(new Unit(x - 10, y - 10, "enemy", "Skeleton"));
+    units.push(new Unit(x - 10, y + 10, "enemy", "Skeleton"));
+    units.push(new Unit(x +  0, y + 30, "enemy", "Skeleton"));
+    units.push(new Unit(x + 10, y - 30, "enemy", "Skeleton"));
+    units.push(new Unit(x + 10, y - 10, "enemy", "Skeleton"));
+    units.push(new Unit(x + 10, y + 10, "enemy", "Skeleton"));
+    units.push(new Unit(x + 20, y + 30, "enemy", "Skeleton"));
+    units.push(new Unit(x + 30, y - 30, "enemy", "Skeleton"));
+    units.push(new Unit(x + 30, y - 10, "enemy", "Skeleton"));
+    units.push(new Unit(x + 30, y + 10, "enemy", "Skeleton"));
+  }
+  else if (card.name === "Cannon") {
+    units.push(new Unit(x, y, "enemy", "Cannon"));
+  } 
+  else if (card.name === "Tombstone") {
+    units.push(new Unit(x, y, "enemy", "Tombstone"));
+  } 
+  else if (card.name === "Hog Rider") {
+    units.push(new Unit(x, y, "enemy", "Hog Rider"));
+  } 
+  else if (card.name === "Balloon") {
+    units.push(new Unit(x, y, "enemy", "Balloon"));
+  } 
+  else if (card.name === "Wizard") {
+    units.push(new Unit(x, y, "enemy", "Wizard"));
+  } 
+  else if (card.name === "Baby Dragon") {
+    units.push(new Unit(x, y, "enemy", "Baby Dragon"));
+  } 
+  else if (card.name === "Skeleton Dragons") {
+    units.push(new Unit(x + 30, y, "enemy", "Skeleton Dragon"));
+    units.push(new Unit(x - 30, y, "enemy", "Skeleton Dragon"));
+  } 
+  else if (card.name === "Minion Horde") {
+    units.push(new Unit(x - 15, y + 15, "enemy", "Minion"));
+    units.push(new Unit(x + 15, y + 15, "enemy", "Minion"));
+    units.push(new Unit(x, y + 40, "enemy", "Minion"));
+    units.push(new Unit(x - 15, y - 10, "enemy", "Minion"));
+    units.push(new Unit(x + 15, y - 10, "enemy", "Minion"));
+    units.push(new Unit(x, y - 35, "enemy", "Minion"));
+  }
+  else if (card.name === "Goblin Gang") {
+    units.push(new Unit(x - 15, y + 15, "enemy", "Goblin"));
+    units.push(new Unit(x + 15, y + 15, "enemy", "Goblin"));
+    units.push(new Unit(x, y + 40, "enemy", "Goblin"));
+    units.push(new Unit(x - 15, y - 10, "enemy", "Spear Goblin"));
+    units.push(new Unit(x + 15, y - 10, "enemy", "Spear Goblin"));
+    units.push(new Unit(x, y - 35, "enemy", "Spear Goblin"));
+  }
+  else if (card.name === "Pekka") {
+    units.push(new Unit(x, y, "enemy", "Pekka"));
+  } 
+  else if (card.name === "Fire Spirit") {
+    units.push(new Unit(x, y, "enemy", "Fire Spirit"));
+  } 
+  else if (card.name === "Witch") {
+    units.push(new Unit(x, y, "enemy", "Witch"));
+  } 
+  else if (card.name === "Barbarians") {
+    units.push(new Unit(x, y + 15, "enemy", "Barbarian"));
+    units.push(new Unit(x - 10, y - 15, "enemy", "Barbarian"));
+    units.push(new Unit(x + 10, y - 15, "enemy", "Barbarian"));
+    units.push(new Unit(x - 15, y, "enemy", "Barbarian"));
+    units.push(new Unit(x + 15, y, "enemy", "Barbarian"));
+  } 
+    else if (card.name === "Bomber") {
+    units.push(new Unit(x, y, "enemy", "Bomber"));
+  } 
+  else if (card.name === "Wallbreakers") {
+    units.push(new Unit(x + 15, y, "enemy", "Wallbreaker"));
+    units.push(new Unit(x - 15, y, "enemy", "Wallbreaker"));
+  } 
+  else if (card.name === "Bats") {
+    units.push(new Unit(x - 15, y + 15, "enemy", "Bat"));
+    units.push(new Unit(x + 15, y + 15, "enemy", "Bat"));
+    units.push(new Unit(x - 15, y - 10, "enemy", "Bat"));
+    units.push(new Unit(x + 15, y - 10, "enemy", "Bat"));
+    units.push(new Unit(x, y - 35, "enemy", "Bat"));
+  }
+}
+
+function spawnPlayerUnit(card, x, y) {
+  if (card.name === "Knight") {
+    units.push(new Unit(x, y, "player", "Knight"));
+  } 
+  else if (card.name === "Valkyrie") {
+    units.push(new Unit(x, y, "player", "Valkyrie"));
+  } 
+  else if (card.name === "Archers") {
+    units.push(new Unit(x - 15, y, "player", "Archer"));
+    units.push(new Unit(x + 15, y, "player", "Archer"));
+  } 
+  else if (card.name === "Musketeer") {
+    units.push(new Unit(x, y, "player", "Musketeer"));
+  } 
+  else if (card.name === "Three Musketeers") {
+    units.push(new Unit(x - 30, y + 20, "player", "Baby Musketeer"));
+    units.push(new Unit(x + 30, y + 20, "player", "Baby Musketeer"));
+    units.push(new Unit(x, y - 30, "player", "Musketeer"));
+  } 
+  else if (card.name === "Giant") {
+    units.push(new Unit(x, y, "player", "Giant"));
+  }
+  else if (card.name === "Minions") {
+    units.push(new Unit(x - 15, y + 10, "player", "Minion"));
+    units.push(new Unit(x + 15, y + 10, "player", "Minion"));
+    units.push(new Unit(x, y - 15, "player", "Minion"));
+  }
+  else if (card.name === "Mini Pekka") {
+    units.push(new Unit(x, y, "player", "Mini Pekka"));
+  } 
+  else if (card.name === "Skeletons") {
+    units.push(new Unit(x - 15, y + 10, "player", "Skeleton"));
+    units.push(new Unit(x + 15, y + 10, "player", "Skeleton"));
+    units.push(new Unit(x, y - 15, "player", "Skeleton"));
+  }
+  else if (card.name === "Goblins") {
+    units.push(new Unit(x - 15, y + 15, "player", "Goblin"));
+    units.push(new Unit(x + 15, y + 15, "player", "Goblin"));
+    units.push(new Unit(x - 15, y - 15, "player", "Goblin"));
+    units.push(new Unit(x + 15, y - 15, "player", "Goblin"));
+  }
+  else if (card.name === "Spear Goblins") {
+    units.push(new Unit(x - 15, y + 15, "player", "Spear Goblin"));
+    units.push(new Unit(x + 15, y + 15, "player", "Spear Goblin"));
+    units.push(new Unit(x, y - 15, "player", "Spear Goblin"));
+  }
+  else if (card.name === "Skeleton Army") {
+    units.push(new Unit(x - 30, y + 30, "player", "Skeleton"));
+    units.push(new Unit(x - 30, y + 10, "player", "Skeleton"));
+    units.push(new Unit(x - 30, y - 10, "player", "Skeleton"));
+    units.push(new Unit(x - 20, y - 30, "player", "Skeleton"));
+    units.push(new Unit(x - 10, y + 30, "player", "Skeleton"));
+    units.push(new Unit(x - 10, y + 10, "player", "Skeleton"));
+    units.push(new Unit(x - 10, y - 10, "player", "Skeleton"));
+    units.push(new Unit(x +  0, y - 30, "player", "Skeleton"));
+    units.push(new Unit(x + 10, y + 30, "player", "Skeleton"));
+    units.push(new Unit(x + 10, y + 10, "player", "Skeleton"));
+    units.push(new Unit(x + 10, y - 10, "player", "Skeleton"));
+    units.push(new Unit(x + 20, y - 30, "player", "Skeleton"));
+    units.push(new Unit(x + 30, y + 30, "player", "Skeleton"));
+    units.push(new Unit(x + 30, y + 10, "player", "Skeleton"));
+    units.push(new Unit(x + 30, y - 10, "player", "Skeleton"));
+  }
+
+  else if (card.name === "Cannon") {
+    units.push(new Unit(x, y, "player", "Cannon"));
+  } 
+  else if (card.name === "Tombstone") {
+    units.push(new Unit(x, y, "player", "Tombstone"));
+  } 
+  else if (card.name === "Hog Rider") {
+    units.push(new Unit(x, y, "player", "Hog Rider"));
+  } 
+  else if (card.name === "Balloon") {
+    units.push(new Unit(x, y, "player", "Balloon"));
+  } 
+  else if (card.name === "Wizard") {
+    units.push(new Unit(x, y, "player", "Wizard"));
+  } 
+  else if (card.name === "Baby Dragon") {
+    units.push(new Unit(x, y, "player", "Baby Dragon"));
+  } 
+  else if (card.name === "Skeleton Dragons") {
+    units.push(new Unit(x + 30, y, "player", "Skeleton Dragon"));
+    units.push(new Unit(x - 30, y, "player", "Skeleton Dragon"));
+  } 
+  else if (card.name === "Minion Horde") {
+    units.push(new Unit(x - 15, y - 15, "player", "Minion"));
+    units.push(new Unit(x + 15, y - 15, "player", "Minion"));
+    units.push(new Unit(x, y - 40, "player", "Minion"));
+    units.push(new Unit(x - 15, y + 10, "player", "Minion"));
+    units.push(new Unit(x + 15, y + 10, "player", "Minion"));
+    units.push(new Unit(x, y + 35, "player", "Minion"));
+  }
+  else if (card.name === "Goblin Gang") {
+    units.push(new Unit(x - 15, y - 15, "player", "Goblin"));
+    units.push(new Unit(x + 15, y - 15, "player", "Goblin"));
+    units.push(new Unit(x, y - 40, "player", "Goblin"));
+    units.push(new Unit(x - 15, y + 10, "player", "Spear Goblin"));
+    units.push(new Unit(x + 15, y + 10, "player", "Spear Goblin"));
+    units.push(new Unit(x, y + 35, "player", "Spear Goblin"));
+  }
+  else if (card.name === "Pekka") {
+    units.push(new Unit(x, y, "player", "Pekka"));
+  } 
+  else if (card.name === "Fire Spirit") {
+    units.push(new Unit(x, y, "player", "Fire Spirit"));
+  } 
+  else if (card.name === "Witch") {
+    units.push(new Unit(x, y, "player", "Witch"));
+  } 
+  else if (card.name === "Barbarians") {
+    units.push(new Unit(x, y - 15, "player", "Barbarian"));
+    units.push(new Unit(x - 10, y + 15, "player", "Barbarian"));
+    units.push(new Unit(x + 10, y + 15, "player", "Barbarian"));
+    units.push(new Unit(x - 15, y, "player", "Barbarian"));
+    units.push(new Unit(x + 15, y, "player", "Barbarian"));
+  } 
+  else if (card.name === "Bomber") {
+    units.push(new Unit(x, y, "player", "Bomber"));
+  } 
+  else if (card.name === "Wallbreakers") {
+    units.push(new Unit(x + 15, y, "player", "Wallbreaker"));
+    units.push(new Unit(x - 15, y, "player", "Wallbreaker"));
+  }
+  else if (card.name === "Bats") {
+    units.push(new Unit(x - 15, y - 15, "player", "Bat"));
+    units.push(new Unit(x + 15, y - 15, "player", "Bat"));
+    units.push(new Unit(x - 15, y + 10, "player", "Bat"));
+    units.push(new Unit(x + 15, y + 10, "player", "Bat"));
+    units.push(new Unit(x, y + 35, "player", "Bat"));
+  }
+}
+  
+function castSpell(card, x, y, team) {
+    pendingSpells.push({
+        card,
+        x,
+        y,
+        team,
+        timer: card.delay
+    });
+}
+
+function updateSpells() {
+    for (let i = pendingSpells.length - 1; i >= 0; i--) {
+        const s = pendingSpells[i];
+        s.timer--;
+
+        if (s.timer <= 0) {
+            resolveSpell(s.card, s.x, s.y, s.team);
+            pendingSpells.splice(i, 1);
+        }
+    }
+}
+
+function resolveSpell(card, x, y, team) {
+    if (card.name === "Fireball" || card.name === "Arrows" || card.name === "Zap") {
+        for (const u of units) {
+            if (u.team === team) continue;
+            const d = distance({ x, y }, u);
+            if (d <= card.radius) {
+                u.hp -= card.damage;
+                if (card.name === "Zap") {
+                    u.target = null;
+                    u.currentAttackCooldown = u.attackCooldown + 50; //(45,inf)
+              }
+            }
+        }
+    }
+
+        // damage towers too
+        const targetTowers = team === "player" ? enemyTowers : playerTowers;
+        for (const t of targetTowers) {
+            const d = distance({ x, y }, t);
+            if (d <= card.radius) t.hp -= card.damage * 0.25;
+        }
+
+        if (card.name === "Fireball") {
+            effects.push({ x, y, radius: card.radius, timer: 30, type: "fireball" });
+        } else if (card.name === "Arrows") {
+            const dotCount = 50;
+            const dots = [];
+            for (let j = 0; j < dotCount; j++) {
+                const angle = Math.random() * 2 * Math.PI;
+                const r = Math.random() * card.radius;
+                dots.push({
+                    x: x + r * Math.cos(angle),
+                    y: y + r * Math.sin(angle)
+                });
+            }
+            effects.push({ x, y, radius: card.radius, timer: 50, type: "arrows", dots });
+        } else if (card.name === "Zap") {
+            effects.push({
+                x,
+                y,
+                radius: card.radius,
+                timer: 12,
+                type: "zap",
+                bolts: generateZapBolts(x, y, card.radius)
+            });
+        }
+}
+
+function generateZapBolts(x, y, radius) {
+    const bolts = [];
+    const boltCount = 6;
+
+    for (let i = 0; i < boltCount; i++) {
+        const segments = [];
+        const angle = Math.random() * Math.PI * 2;
+        const steps = 6;
+
+        for (let j = 0; j <= steps; j++) {
+            const t = j / steps;
+            const jitter = (Math.random() - 0.5) * 10;
+            segments.push({
+                x: x + Math.cos(angle) * radius * t + jitter,
+                y: y + Math.sin(angle) * radius * t + jitter
+            });
+        }
+
+        bolts.push(segments);
+    }
+
+    return bolts;
+}
+
+function drawEffects() {
+    for (let i = effects.length - 1; i >= 0; i--) {
+        const e = effects[i];
+
+        if (e.type === "fireball") {
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255,100,0,${e.timer / 30})`;
+            ctx.fill();
+            ctx.closePath();
+        } 
+        else if (e.type === "arrows") {
+            for (const dot of e.dots) {
+                ctx.beginPath();
+                ctx.arc(dot.x, dot.y, 2, 0, Math.PI * 2);
+                ctx.fillStyle = "maroon";
+                ctx.fill();
+                ctx.closePath();
+            }
+        } 
+      else if (e.type === "zap") {
+          ctx.strokeStyle = `rgba(255,255,255,${e.timer / 12})`;
+          ctx.lineWidth = 2;
+      
+          for (const bolt of e.bolts) {
+              ctx.beginPath();
+              ctx.moveTo(bolt[0].x, bolt[0].y);
+              for (let i = 1; i < bolt.length; i++) {
+                  ctx.lineTo(bolt[i].x, bolt[i].y);
+              }
+              ctx.stroke();
+          }
+      
+          // quick flash
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255,255,255,${e.timer / 30})`;
+          ctx.fill();
+      }
+
+        e.timer--;
+        if (e.timer <= 0) effects.splice(i, 1);
+    }
+}
+
+function drawTimer() {
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
+  ctx.fillStyle = "red";
+  ctx.font = "24px Arial";
+  ctx.textAlign = "right";
+  ctx.fillText(`${minutes}:${seconds.toString().padStart(2,'0')}`, canvas.width, 30);
+
+  if (timeLeft < 60) {
+    ctx.font = "20px Arial";
+    ctx.fillText("x2", canvas.width, 60);
+  }
+  if (timeLeft <= 0) {
+    ctx.font = "20px Arial";
+    ctx.fillText("SD", canvas.width, 90);
+  }
+}
+
+function drawUnits() {
+  for (const u of units) {
+    u.draw(ctx);
+  }
+}
+
+function getEnemyUnits(unit) {
+  return units.filter(u => u.team !== unit.team);
+}
+
+function drawPockets() {
+  if (!gameStarted) {
+      return;
+  }
+  
+  ctx.strokeStyle = "magenta";
+  ctx.lineWidth = 1;
+
+  const midX = canvas.width / 2;
+  const pocketDepth = 75;
+
+  // PLAYER pockets (enemy tower destroyed)
+  if (sideHasPocket("player", "left")) {
+    ctx.strokeRect(
+      0,
+      RIVER_TOP - pocketDepth,
+      midX,
+      pocketDepth
+    );
+  }
+
+  if (sideHasPocket("player", "right")) {
+    ctx.strokeRect(
+      midX,
+      RIVER_TOP - pocketDepth,
+      midX,
+      pocketDepth
+    );
+  }
+
+  // ENEMY pockets (player tower destroyed)
+  if (sideHasPocket("enemy", "left")) {
+    ctx.strokeRect(
+      0,
+      RIVER_BOTTOM,
+      midX,
+      pocketDepth
+    );
+  }
+
+  if (sideHasPocket("enemy", "right")) {
+    ctx.strokeRect(
+      midX,
+      RIVER_BOTTOM,
+      midX,
+      pocketDepth
+    );
+  }
+}
+
+  
+// Draw elixir bar
+function drawElixirBar() {
+  const barWidth = 200;
+  const barHeight = 20;
+  const x = 100;
+  const y = 650;
+
+  // 🔴 CLEAR the elixir bar area first
+  ctx.clearRect(x - 5, y - 5, barWidth + 120, barHeight + 20);
+
+  // Background
+  ctx.fillStyle = "lightgray";
+  ctx.fillRect(x, y, barWidth, barHeight);
+
+  // Elixir fill
+  ctx.fillStyle = "magenta";
+  const fillWidth = (playerElixir / maxElixir) * barWidth;
+  ctx.fillRect(x, y, fillWidth, barHeight);
+
+  // Text
+  ctx.fillStyle = "magenta";
+  ctx.font = "16px Arial";
+  ctx.fillText(
+    playerElixir + " / " + maxElixir,
+    x + barWidth + 20,
+    y + barHeight - 4
+  );
+}
+
+function distance(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+  
+// Draw hand
+function drawHand() {
+  handCards.length = 0;
+
+  const cardWidth = 70;
+  const cardHeight = 100;
+  const startX = 25;
+  const y = 725;
+  const spacing = 24;
+
+  for (let i = 0; i < 4; i++) {
+    const x = startX + i * (cardWidth + spacing);
+    const cardIndex = playerHand[i];
+    const card = cards[cardIndex];
+    const cost = card.cost;
+
+    // store card bounds
+    handCards.push({ x, y, w: cardWidth, h: cardHeight });
+
+    // highlight if selected
+    if (selectedCardIndex === i) {
+      ctx.fillStyle = "gold";
+      ctx.fillRect(x - 4, y - 4, cardWidth + 8, cardHeight + 8);
+    }
+
+    // Dim card if not enough elixir
+    ctx.globalAlpha = playerElixir < cost ? 0.5 : 1.0;
+
+    // card body
+    ctx.fillStyle = "white";
+    ctx.fillRect(x, y, cardWidth, cardHeight);
+
+    // ---------- ICON ----------
+    ctx.globalAlpha = 1.0;
+
+    if (card.name === "Zap") {
+      // skinny lightning rectangle
+      ctx.fillStyle = "blue";
+
+      const boltWidth = 6;
+      const boltHeight = 32;
+
+      ctx.fillRect(
+        x + cardWidth / 2 - boltWidth / 2,
+        y + 35 - boltHeight / 2,
+        boltWidth,
+        boltHeight
+      );
+    } else {
+      // normal circle icons
+      ctx.beginPath();
+      ctx.arc(x + cardWidth / 2, y + 35, 20, 0, Math.PI * 2);
+
+      if (card.name === "Knight") ctx.fillStyle = "gold";
+      if (card.name === "Valkyrie") ctx.fillStyle = "darkorange";
+      if (card.name === "Archers") ctx.fillStyle = "magenta";
+      if (card.name === "Musketeer") ctx.fillStyle = "blueviolet";
+      if (card.name === "Three Musketeers") ctx.fillStyle = "blueviolet";
+      if (card.name === "Giant") ctx.fillStyle = "orange";
+      if (card.name === "Minions") ctx.fillStyle = "cornflowerblue";
+      if (card.name === "Mini Pekka") ctx.fillStyle = "navy";
+      if (card.name === "Fireball") ctx.fillStyle = "red";
+      if (card.name === "Arrows") ctx.fillStyle = "maroon";
+      if (card.name === "Skeletons") ctx.fillStyle = "floralwhite";
+      if (card.name === "Skeleton Army") ctx.fillStyle = "floralwhite";
+      if (card.name === "Cannon") ctx.fillStyle = "black";
+      if (card.name === "Goblins") ctx.fillStyle = "lawngreen";
+      if (card.name === "Spear Goblins") ctx.fillStyle = "green";
+      if (card.name === "Tombstone") ctx.fillStyle = "lightcyan";
+      if (card.name === "Hog Rider") ctx.fillStyle = "saddlebrown";
+      if (card.name === "Balloon") ctx.fillStyle = "lightcoral";
+      if (card.name === "Wizard") ctx.fillStyle = "dodgerblue";
+      if (card.name === "Baby Dragon") ctx.fillStyle = "lime";
+      if (card.name === "Skeleton Dragons") ctx.fillStyle = "floralwhite";
+      if (card.name === "Minion Horde") ctx.fillStyle = "cornflowerblue";
+      if (card.name === "Goblin Gang") ctx.fillStyle = "lawngreen";
+      if (card.name === "Pekka") ctx.fillStyle = "midnightblue";
+      if (card.name === "Fire Spirit") {ctx.globalAlpha = 0.5; ctx.fillStyle = "red";}
+      if (card.name === "Witch") ctx.fillStyle = "indigo";
+      if (card.name === "Barbarians") ctx.fillStyle = "yellow";
+      if (card.name === "Bomber") ctx.fillStyle = "sienna";
+      if (card.name === "Wallbreakers") ctx.fillStyle = "royalblue";
+      if (card.name === "Bats") ctx.fillStyle = "dimgray";
+
+      ctx.fill();
+      ctx.closePath();
+      ctx.globalAlpha = 1;
+
+    }
+
+    // ---------- CARD NAME ----------
+    ctx.fillStyle = "black";
+    ctx.font = "10px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(card.name, x + cardWidth / 2, y + 70);
+
+    // ---------- ELIXIR COST ----------
+    ctx.fillStyle = "magenta";
+    ctx.font = "bold 16px Arial";
+    ctx.fillText(cost, x + cardWidth / 2, y + 90);
+
+    // ---------- BORDER ----------
+    ctx.globalAlpha = 1.0;
+    ctx.strokeStyle = "black";
+    ctx.strokeRect(x, y, cardWidth, cardHeight);
+  }
+}
+
+// In drawArena or a separate tower management function:
+function updateTowers() {
+  // Player towers
+  for (let i = playerTowers.length - 1; i >= 0; i--) {
+    const t = playerTowers[i];
+    t.update();
+    t.draw(ctx);
+
+    // Optional: draw attack line
+    if (t.target) {
+      ctx.strokeStyle = t.team === "player" ? "blue" : "red";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(t.x, t.y);
+      ctx.lineTo(t.target.x, t.target.y);
+      ctx.stroke();
+    }
+
+    if (!t.isKing && t.hp <= 0) {
+      // Remove the dead tower
+      playerTowers.splice(i, 1);
+      if (timeLeft == 0) endGameByTowers();
+    
+      // Apply 1 damage to all remaining towers
+      for (let j = 0; j < playerTowers.length; j++) {
+        playerTowers[j].hp--;
+      }
+    }
+
+    if (t.isKing && t.hp <= 0) {
+        playerTowers.splice(i, 1);
+        endGameByTowers();
+    }
+  }
+
+  // Enemy towers
+  for (let i = enemyTowers.length - 1; i >= 0; i--) {
+    const t = enemyTowers[i];
+    t.update();
+    t.draw(ctx);
+
+    if (t.target) {
+      ctx.strokeStyle = t.team === "player" ? "blue" : "red";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(t.x, t.y);
+      ctx.lineTo(t.target.x, t.target.y);
+      ctx.stroke();
+    }
+
+    if (!t.isKing && t.hp <= 0) {
+      enemyTowers.splice(i, 1);
+      if (timeLeft == 0) endGameByTowers();
+       for (let j = 0; j < enemyTowers.length; j++) {
+        enemyTowers[j].hp--;
+      }
+    }
+    if (t.isKing && t.hp <= 0) {
+        enemyTowers.splice(i, 1);
+        endGameByTowers();
+    }
+  }
+}
+
+  
+// Tower class
+class Tower {
+  constructor(x, y, hp, team, isKing = false) {
+    this.x = x;
+    this.y = y;
+    this.hp = hp;
+    this.maxHp = hp;
+    this.team = team;
+    this.isKing = isKing;
+
+    this.range = 175;
+    this.damage = 109;
+    this.attackCooldown = 48;
+    this.cooldown = 0;
+
+    this.target = null; // 👈 sticky target
+  }
+
+  draw(ctx) {
+  // Determine tower color
+  let fillColor;
+  if (this.isKing && this.hp === this.maxHp) {
+    fillColor = this.team === "player" ? "black" : "black"; // full-health king towers
+  } else {
+    fillColor = this.team === "player" ? "lightskyblue" : "lightpink"; // normal towers
+  }
+
+  ctx.fillStyle = fillColor;
+  ctx.fillRect(this.x - 25, this.y - 25, 50, 50);
+
+  // Draw HP bar
+  ctx.fillStyle = this.team === "player" ? "blue" : "red";
+  ctx.fillRect(this.x - 25, this.y - 35, 50 * (this.hp / this.maxHp), 5);
+}
+
+update() {
+  if (this.hp <= 0) return;
+
+  // King tower rule (only attacks after damaged)
+  if (this.isKing && this.hp === this.maxHp) return;
+
+  // If we have a target, check if it's still valid
+  if (this.target) {
+    const d = distance(this, this.target);
+
+    if (this.target.hp <= 0 || d > this.range) {
+      this.target = null; // ❌ drop target
+    }
+  }
+
+  // Acquire target ONLY if none
+  if (!this.target) {
+    const enemies = units.filter(u =>
+        u.team !== this.team &&
+        u.hp > 0 &&
+        distance(this, u) <= this.range
+    );
+
+    if (enemies.length > 0) {
+        this.target = enemies.reduce((closest, enemy) => {
+            return distance(this, enemy) < distance(this, closest)
+                ? enemy
+                : closest;
+        });
+    }
+}
+
+  // Attack if possible
+  if (this.target) {
+    this.cooldown--;
+
+    if (this.cooldown <= 0) {
+      this.target.hp -= this.damage;
+      this.cooldown = this.attackCooldown;
+    }
+  }
+}
+}
+
+function endGameByTowers() {
+  
+  const playerTowerCount = playerTowers.length;
+  const enemyTowerCount = enemyTowers.length;
+
+  let result = null;
+  if (playerTowerCount > enemyTowerCount) {
+    result = "PLAYER";
+    if (gameMode === "PVP") {
+      wins++;
+    }
+    updateScoreboard();
+  }
+  else if (enemyTowerCount > playerTowerCount) {
+    result = "ENEMY";
+    if (gameMode === "PVP") {
+      losses++;
+    }
+    updateScoreboard();
+  }
+  else { 
+      return; // draw → ignore
+  }
+  // ---- UPDATE STATS ----
+  for (const idx of playerData) {
+    const card = cards[idx];
+    const stat = cardStats[card.id];
+    stat.games++;
+    if (result === "PLAYER") stat.wins++;
+    else stat.losses++;
+  }
+
+  for (const idx of enemyData) {
+    const card = cards[idx];
+    const stat = cardStats[card.id];
+    stat.games++;
+    if (result === "ENEMY") stat.wins++;
+    else stat.losses++;
+  }
+
+  // ---- LOG ALL WINRATES ----
+  console.log("=== CARD WINRATES ===");
+  
+  Object.values(cardStats)
+    .sort((a, b) =>
+      (b.games ? (b.wins / b.games - 0.5) * 2 * Math.sqrt(b.games) : 0) -
+      (a.games ? (a.wins / a.games - 0.5) * 2 * Math.sqrt(a.games) : 0)
+    )
+    .forEach(s => {
+      const rate = s.games ? ((s.wins / s.games) * 100).toFixed(1) : "0.0";
+      const z = s.games ? (s.wins / s.games - 0.5) * 2 * Math.sqrt(s.games) : 0;
+      console.log(`${s.name}: ${rate}% z=${z.toFixed(2)} (${s.wins}/${s.games})`);
+    });
+
+
+  // ---- RESET GAME STATE SAFELY ----
+  units.length = 0;
+  effects.length = 0;
+  pendingSpells.length = 0;
+  playerTowers.length = 0;
+  enemyTowers.length = 0;
+
+  // ---- START NEW GAME ----
+  console.log("game over");
+  if (gameMode === "AI_VS_AI"){
+      const winningDeck = result === "PLAYER" ? playerData : enemyData;
+      randomDecks = randomEnemyDeck(16);
+      enemyDeck = randomDecks.slice(0,8);
+      playerDeck = randomDecks.slice(8,16);
+      startGame(playerDeck);
+  } else {
+      if (wins < 12 && losses < 3) {  
+        enemyDeck = randomEnemyDeck(8);
+        playerDeck = playerData;
+        startGame(playerDeck);
+      } else if (wins == 12) {
+        showEndMessage("win");
+      } else {
+        showEndMessage("loss");
+      }
+  }
+}
+
+function showEndMessage(type) {
+  const overlay = document.getElementById("end-overlay");
+  const title = document.getElementById("end-title");
+  const button = document.getElementById("end-button");
+
+  if (type === "win") {
+    title.textContent = "Challenge Complete! 🏆";
+  } else {
+    title.textContent = "Challenge Failed! 💀";
+  }
+
+  overlay.style.display = "flex";
+
+  button.onclick = () => {
+    overlay.style.display = "none";
+  };
+}
+
+// Create towers
+function initTowers() { 
+    playerTowers = [
+      new Tower(75, 500, 3000, "player"),
+      new Tower(200, 550, 5000, "player", true), // King tower in center
+      new Tower(325, 500, 3000, "player")
+    ];
+    
+    enemyTowers = [
+      new Tower(75, 100, 3000, "enemy"),
+      new Tower(200, 50, 5000, "enemy", true), // Enemy king tower
+      new Tower(325, 100, 3000, "enemy")
+    ];
+}
+
+class Unit {
+  constructor(x, y, team, type = "Knight") {
+    this.x = x;
+    this.y = y;
+    this.team = team;
+    this.type = type;  // Knight, Archer, etc.
+
+    // Default stats
+    if (type === "Knight") {
+      this.hp = 1766;
+      this.maxHp = this.hp;
+      this.speed = 0.5;
+      this.r = 24;
+      this.attackRange = 40;
+      this.attackDamage = 202; 
+      this.attackCooldown = 72;
+      this.isAir = false;
+      this.attacksAir = false;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 170;
+      this.isBuilding = false;
+      this.decay = 0;
+    } else if (type === "Valkyrie") {
+      this.hp = 1907;
+      this.maxHp = this.hp;
+      this.speed = 0.5;
+      this.r = 20;
+      this.attackRange = 40;
+      this.attackDamage = 266; 
+      this.attackCooldown = 90;
+      this.isAir = false;
+      this.attacksAir = false;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 170;
+      this.isBuilding = false;
+      this.decay = 0;
+      this.splashRadius = 50;
+    } else if (type === "Archer") {
+      this.hp = 304;
+      this.maxHp = this.hp;
+      this.speed = 0.5;
+      this.r = 16;
+      this.attackRange = 145; 
+      this.attackDamage = 112;  
+      this.attackCooldown = 78;
+      this.isAir = false;
+      this.attacksAir = true;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 170;
+      this.isBuilding = false;
+      this.decay = 0;
+    } else if (type === "Musketeer") {
+      this.hp = 721;
+      this.maxHp = this.hp;
+      this.speed = 0.5;
+      this.r = 20;
+      this.attackRange = 160;  
+      this.attackDamage = 217;
+      this.attackCooldown = 84;
+      this.isAir = false;
+      this.attacksAir = true;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 185;
+      this.isBuilding = false;
+      this.decay = 0;
+    } else if (type === "Baby Musketeer") {
+      this.hp = 304;
+      this.maxHp = this.hp;
+      this.speed = 0.5;
+      this.r = 16;
+      this.attackRange = 160;  
+      this.attackDamage = 95;
+      this.attackCooldown = 60;
+      this.isAir = false;
+      this.attacksAir = true;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 185;
+      this.isBuilding = false;
+      this.decay = 0;
+    } else if (type === "Giant") {
+      this.hp = 4080;
+      this.maxHp = this.hp;
+      this.speed = 0.4;
+      this.r = 36;
+      this.attackRange = 40;  
+      this.attackDamage = 253;
+      this.attackCooldown = 60; 
+      this.isAir = false;
+      this.attacksAir = false;
+      this.targetsOnlyBuildings = true;  
+      this.sightRange = 200;
+      this.isBuilding = false;
+      this.decay = 0;
+    } else if (type === "Minion") {
+      this.hp = 230;
+      this.maxHp = this.hp;
+      this.speed = 0.7;
+      this.r = 16;
+      this.attackRange = 80; 
+      this.attackDamage = 107; 
+      this.attackCooldown = 66; 
+      this.isAir = true;
+      this.attacksAir = true;
+      this.targetsOnlyBuildings = false; 
+      this.sightRange = 170;
+      this.isBuilding = false;
+      this.decay = 0;
+    } else if (type === "Mini Pekka") {
+      this.hp = 1390;
+      this.maxHp = this.hp;
+      this.speed = 0.7;
+      this.r = 20;
+      this.attackRange = 40;
+      this.attackDamage = 755;
+      this.attackCooldown = 90;
+      this.isAir = false;
+      this.attacksAir = false;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 170;
+      this.isBuilding = false;
+      this.decay = 0;
+    } else if (type === "Skeleton") {
+      this.hp = 81;
+      this.maxHp = this.hp;
+      this.speed = 0.5;
+      this.r = 8;
+      this.attackRange = 40;
+      this.attackDamage = 81; 
+      this.attackCooldown = 54;
+      this.isAir = false;
+      this.attacksAir = false;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 170;
+      this.isBuilding = false;
+      this.decay = 0;
+    } else if (type === "Goblin") {
+      this.hp = 202;
+      this.maxHp = this.hp;
+      this.speed = 1.0;
+      this.r = 12;
+      this.attackRange = 40;
+      this.attackDamage = 120; 
+      this.attackCooldown = 66;
+      this.isAir = false;
+      this.attacksAir = false;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 170;
+      this.isBuilding = false;
+      this.decay = 0;
+    } else if (type === "Spear Goblin") {
+      this.hp = 133;
+      this.maxHp = this.hp;
+      this.speed = 1.0;
+      this.r = 12;
+      this.attackRange = 130;
+      this.attackDamage = 81; 
+      this.attackCooldown = 102;
+      this.isAir = false;
+      this.attacksAir = true;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 170;
+      this.isBuilding = false;
+      this.decay = 0;
+    } else if (type === "Cannon") {
+      this.hp = 824;
+      this.maxHp = this.hp;
+      this.speed = 0;
+      this.r = 24;
+      this.attackRange = 145;
+      this.attackDamage = 212; 
+      this.attackCooldown = 54;
+      this.isAir = false;
+      this.attacksAir = false;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 145;
+      this.isBuilding = true;
+      this.decay = 0.4;
+    } else if (type === "Tombstone") {
+      this.hp = 529;
+      this.maxHp = this.hp;
+      this.speed = 0;
+      this.r = 24;
+      this.attackRange = 0;
+      this.attackDamage = 0;
+      this.attackCooldown = 1;
+      this.isAir = false;
+      this.attacksAir = false;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 1;
+      this.isBuilding = true;
+      this.decay = 0.25;
+      this.spawnSkeletons = (frameClock + 30) % 120;
+    } else if (type === "Hog Rider") {
+      this.hp = 1697;
+      this.maxHp = this.hp;
+      this.speed = 1.0;
+      this.r = 22;
+      this.attackRange = 40;  
+      this.attackDamage = 317; 
+      this.attackCooldown = 96;  
+      this.isAir = false;
+      this.attacksAir = false;
+      this.targetsOnlyBuildings = true; 
+      this.sightRange = 200;
+      this.isBuilding = false;
+      this.decay = 0;
+    } else if (type === "Balloon") {
+      this.hp = 1679;
+      this.maxHp = this.hp;
+      this.speed = 0.5;
+      this.r = 30;
+      this.attackRange = 40;  
+      this.attackDamage = 640;
+      this.attackCooldown = 120;  
+      this.isAir = true;
+      this.attacksAir = false;
+      this.targetsOnlyBuildings = true; 
+      this.sightRange = 200;
+      this.isBuilding = false;
+      this.decay = 0;
+    } else if (type === "Wizard") {
+      this.hp = 755;
+      this.maxHp = this.hp;
+      this.speed = 0.5;
+      this.r = 20;
+      this.attackRange = 145;  
+      this.attackDamage = 281; 
+      this.attackCooldown = 84;
+      this.isAir = false;
+      this.attacksAir = true;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 160;
+      this.isBuilding = false;
+      this.decay = 0;
+      this.splashRadius = 35;
+    } else if (type === "Baby Dragon") {
+      this.hp = 1152;
+      this.maxHp = this.hp;
+      this.speed = 0.7;
+      this.r = 24;
+      this.attackRange = 100;  
+      this.attackDamage = 161
+      this.attackCooldown = 96;
+      this.isAir = true;
+      this.attacksAir = true;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 160;
+      this.isBuilding = false;
+      this.decay = 0;
+      this.splashRadius = 35;
+    } else if (type === "Skeleton Dragon") {
+      this.hp = 560;
+      this.maxHp = this.hp;
+      this.speed = 0.7;
+      this.r = 24;
+      this.attackRange = 100;  
+      this.attackDamage = 90; //(84, inf)
+      this.attackCooldown = 90;
+      this.isAir = true;
+      this.attacksAir = true;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 160;
+      this.isBuilding = false;
+      this.decay = 0;
+      this.splashRadius = 35;
+    } else if (type === "Pekka") {
+      this.hp = 3760;
+      this.maxHp = this.hp;
+      this.speed = 0.4;
+      this.r = 36;
+      this.attackRange = 55;
+      this.attackDamage = 816; 
+      this.attackCooldown = 108;
+      this.isAir = false;
+      this.attacksAir = false;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 170;
+      this.isBuilding = false;
+      this.decay = 0;
+    } else if (type === "Fire Spirit") {
+      this.hp = 230;
+      this.maxHp = this.hp;
+      this.speed = 1.0;
+      this.r = 16;
+      this.attackRange = 80;  
+      this.attackDamage = 207; 
+      this.attackCooldown = 20;
+      this.isAir = false;
+      this.attacksAir = true;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 160;
+      this.isBuilding = false;
+      this.decay = 0;
+      this.splashRadius = 35;
+    } else if (type === "Witch") {
+      this.hp = 839;
+      this.maxHp = this.hp;
+      this.speed = 0.5;
+      this.r = 20;
+      this.attackRange = 145;  
+      this.attackDamage = 135; 
+      this.attackCooldown = 66;
+      this.isAir = false;
+      this.attacksAir = true;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 160;
+      this.isBuilding = false;
+      this.decay = 0;
+      this.splashRadius = 20;
+      this.spawnSkeletons = (frameClock + 60) % 600;
+    } else if (type === "Barbarian") {
+      this.hp = 670;
+      this.maxHp = this.hp;
+      this.speed = 0.5;
+      this.r = 20;
+      this.attackRange = 40;  
+      this.attackDamage = 192;   
+      this.attackCooldown = 78;
+      this.isAir = false;
+      this.attacksAir = false;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 160;
+      this.isBuilding = false;
+      this.decay = 0;
+    } else if (type === "Bomber") {
+      this.hp = 304;
+      this.maxHp = this.hp;
+      this.speed = 0.5;
+      this.r = 16;
+      this.attackRange = 100;  
+      this.attackDamage = 225; 
+      this.attackCooldown = 102;
+      this.isAir = false;
+      this.attacksAir = false;
+      this.targetsOnlyBuildings = false;
+      this.sightRange = 160;
+      this.isBuilding = false;
+      this.decay = 0;
+      this.splashRadius = 35;
+    } else if (type === "Wallbreaker") {
+      this.hp = 330;
+      this.maxHp = this.hp;
+      this.speed = 1.0;
+      this.r = 16;
+      this.attackRange = 40;  
+      this.attackDamage = 350; 
+      this.attackCooldown = 1;
+      this.isAir = false;
+      this.attacksAir = false;
+      this.targetsOnlyBuildings = true;
+      this.sightRange = 200;
+      this.isBuilding = false;
+      this.decay = 0;
+      this.splashRadius = 35;
+    } else if (type === "Bat") {
+      this.hp = 81;
+      this.maxHp = this.hp;
+      this.speed = 1.0;
+      this.r = 8;
+      this.attackRange = 40;  
+      this.attackDamage = 81; 
+      this.attackCooldown = 72;
+      this.isAir = true;
+      this.attacksAir = true;
+      this.targetsOnlyBuildings = false;  // Only targets towers!
+      this.sightRange = 160;
+      this.isBuilding = false;
+      this.decay = 0;
+    }
+
+    this.type = type;
+    this.target = null;
+    this.currentAttackCooldown = this.attackCooldown;
+  }
+
+update() {
+  
+  this.hp -= this.decay;
+
+  if (this.type === "Witch") {
+      if (this.spawnSkeletons === frameClock % 600) {
+          units.push(new Unit(this.x + 50, this.y, this.team, "Skeleton"));
+          units.push(new Unit(this.x - 50, this.y, this.team, "Skeleton"));
+          units.push(new Unit(this.x, this.y + 50, this.team, "Skeleton"));
+          units.push(new Unit(this.x, this.y - 50, this.team, "Skeleton"));
+      }
+  }
+    if (this.type === "Tombstone") {
+      if (this.spawnSkeletons === frameClock % 120) {
+          units.push(new Unit(this.x + 25, this.y, this.team, "Skeleton"));
+          units.push(new Unit(this.x - 25, this.y, this.team, "Skeleton"));
+      }
+  }
+  
+  // Drop target if dead
+  if (this.target && this.target.hp <= 0) {
+    this.target = null;
+  }
+
+  /* ======================================================
+     ANTI-CROWDING (ALWAYS APPLIES)
+     Air ↔ Air only, Ground ↔ Ground only
+  ====================================================== */
+  let sepX = 0;
+  let sepY = 0;
+  const separationRadius = 25;
+
+  for (const other of units) {
+    if (other === this) continue;
+
+    // 🚫 Separate air & ground layers
+    if (this.isAir !== other.isAir) continue;
+
+    // Not for buildlings
+    if (this.isBuilding) continue;
+
+    const dist = distance(this, other);
+    if (dist > 0 && dist < separationRadius) {
+      const repulse = (separationRadius - dist) / separationRadius;
+      sepX -= ((other.x - this.x) / dist) * repulse;
+      sepY -= ((other.y - this.y) / dist) * repulse;
+    }
+  }
+
+  // Apply anti-crowding movement
+  const sepMag = Math.hypot(sepX, sepY);
+  if (sepMag > 0) {
+    this.x += (sepX / sepMag) * this.speed * 0.25;
+    this.y += (sepY / sepMag) * this.speed * 0.25;
+  }
+
+  /* ======================================================
+     ATTACKING (STICKY)
+  ====================================================== */
+  if (this.target) {
+      const d = distance(this, this.target);
+  
+      if (d <= this.attackRange) {
+          if (this.currentAttackCooldown > 0) {
+              this.currentAttackCooldown--;
+          }
+  
+          if (this.currentAttackCooldown === 0) {
+  
+              // Main target takes damage once
+              this.target.hp -= this.attackDamage;
+  
+              // Splash damage (centered on target)
+            if (this.type === "Valkyrie") {
+                  for (const u of units) {
+                      if (u === this.target) continue;          // no double damage
+                      if (u.team === this.team) continue;       // no friendly fire
+                      if (u.isAir && !this.attacksAir) continue; // air check
+  
+                      const sd = distance(this, u);
+                      if (sd <= this.splashRadius) {
+                          u.hp -= this.attackDamage;
+                      }
+                  }
+            } else if (this.splashRadius > 0) {
+                  for (const u of units) {
+                      if (u === this.target) continue;          // no double damage
+                      if (u.team === this.team) continue;       // no friendly fire
+                      if (u.isAir && !this.attacksAir) continue; // air check
+  
+                      const sd = distance(this.target, u);
+                      if (sd <= this.splashRadius) {
+                          u.hp -= this.attackDamage;
+                      }
+                  }
+              }
+  
+              this.currentAttackCooldown = this.attackCooldown;
+              if (this.type === "Fire Spirit" || this.type === "Wallbreaker") {
+                  this.hp -= 1000;
+              }
+          }
+  
+          return;
+      }
+  }
+
+  /* ======================================================
+     TARGET ACQUISITION
+  ====================================================== */
+  let closest = null;
+  let closestDist = Infinity;
+
+  // Enemy units
+  for (const u of units) {
+    if (u.team === this.team) continue;
+    if (u.isAir && !this.attacksAir) continue;
+    if (!u.isBuilding && this.targetsOnlyBuildings) continue;
+
+    const d = distance(this, u);
+    if (d < closestDist && d <= this.sightRange) {
+      closest = u;
+      closestDist = d;
+    }
+  }
+
+  // Enemy towers
+  const enemyTowersList = this.team === "player" ? enemyTowers : playerTowers;
+  for (const t of enemyTowersList) {
+    const d = distance(this, t);
+    if (d < closestDist) {
+      closest = t;
+      closestDist = d;
+    }
+  }
+
+  this.target = closest;
+  if (!this.target) return;
+
+  /* ======================================================
+     MOVEMENT TOWARD TARGET
+  ====================================================== */
+  if (this.currentAttackCooldown < this.attackCooldown) {
+    this.currentAttackCooldown++;
+  }
+  let moveX, moveY;
+
+  if (!this.isAir && !(this.type === "Hog Rider") && !sameSide(this, this.target)) {
+    const bridge = this.closestBridge();
+    moveX = bridge.x;
+    moveY = bridge.y;
+  } else {
+    moveX = this.target.x;
+    moveY = this.target.y;
+  }
+
+  let dx = moveX - this.x;
+  let dy = moveY - this.y;
+
+  const mag = Math.hypot(dx, dy);
+  if (mag > 0) {
+    this.x += (dx / mag) * this.speed;
+    this.y += (dy / mag) * this.speed;
+  }
+}
+
+  closestBridge() {
+    let best = null;
+    let minDist = Infinity;
+    for (const b of bridges) {
+      const d = Math.hypot(b.x - this.x, b.y - this.y);
+      if (d < minDist) {
+        minDist = d;
+        best = b;
+      }
+    }
+    return best;
+  }
+
+  closestTower(towers) {
+    let best = null;
+    let minDist = Infinity;
+    for (const t of towers) {
+      const d = Math.hypot(t.x - this.x, t.y - this.y);
+      if (d < minDist) {
+        minDist = d;
+        best = t;
+      }
+    }
+    return best;
+  }
+
+  draw(ctx) {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+
+    if (this.type === "Knight") ctx.fillStyle = "gold";
+    else if (this.type === "Archer") ctx.fillStyle = "magenta";
+    else if (this.type === "Valkyrie") ctx.fillStyle = "darkorange";
+    else if (this.type === "Musketeer") ctx.fillStyle = "blueviolet";
+    else if (this.type === "Baby Musketeer") ctx.fillStyle = "blueviolet";
+    else if (this.type === "Giant") ctx.fillStyle = "orange";
+    else if (this.type === "Minion") ctx.fillStyle = "cornflowerblue";
+    else if (this.type === "Mini Pekka") ctx.fillStyle = "navy";
+    else if (this.type === "Skeleton") ctx.fillStyle = "floralwhite";
+    else if (this.type === "Goblin") ctx.fillStyle = "lawngreen";
+    else if (this.type === "Spear Goblin") ctx.fillStyle = "green";
+    else if (this.type === "Cannon") ctx.fillStyle = "black";
+    else if (this.type === "Tombstone") ctx.fillStyle = "lightcyan";
+    else if (this.type === "Hog Rider") ctx.fillStyle = "saddlebrown";
+    else if (this.type === "Balloon") ctx.fillStyle = "lightcoral";
+    else if (this.type === "Wizard") ctx.fillStyle = "dodgerblue";
+    else if (this.type === "Baby Dragon") ctx.fillStyle = "lime";
+    else if (this.type === "Skeleton Dragon") ctx.fillStyle = "floralwhite";
+    else if (this.type === "Pekka") ctx.fillStyle = "midnightblue";
+    else if (this.type === "Fire Spirit") {ctx.globalAlpha = 0.5; ctx.fillStyle = "red";}
+    else if (this.type === "Witch") ctx.fillStyle = "indigo";
+    else if (this.type === "Barbarian") ctx.fillStyle = "yellow";
+    else if (this.type === "Bomber") ctx.fillStyle = "sienna";
+    else if (this.type === "Wallbreaker") ctx.fillStyle = "royalblue";
+    else if (this.type === "Bat") ctx.fillStyle = "dimgray";
+    
+    ctx.fill();
+    ctx.closePath();
+    ctx.globalAlpha = 1;
+    
+    // HP bar
+    ctx.fillStyle = this.team === "player" ? "blue" : "red";
+    ctx.fillRect(
+      this.x - this.r,
+      this.y - this.r - 6,
+      (this.hp / this.maxHp) * this.r * 2,
+      4
+    );
+}
+}
+  
+// Function to generate elixir
+function generateElixir() {
+  if (playerElixir < maxElixir) playerElixir += 1;
+  if (enemyElixir < maxElixir) enemyElixir += 1;
+  if (gameMode == "PVP") {
+    if (Math.random() < wins/12) {
+      enemyElixir += 1;
+    }
+  }
+}
+
+// Draw loop
+function drawArena() {
+  requestAnimationFrame(drawArena);
+  frameClock++;
+  if (frameClock % 60 == 0 && timeLeft > 0){
+    timeLeft--;
+  }
+  if (timeLeft == 0) {
+    endGameByTowers();
+  }
+  // Draw grass
+  ctx.fillStyle = "lightgreen";
+  ctx.fillRect(0, 0, canvas.width, 600);
+
+  // Draw river
+  ctx.fillStyle = "#1E90FF"; // blue river
+  ctx.fillRect(0, 275, canvas.width, 50);
+
+  // Draw bridges
+  ctx.fillStyle = "#8B4513"; // brown
+  const bridgeWidth = 50;
+  const bridgeHeight = 100;
+  const bridgeXs = [75, 325];
+
+  for (let x of bridgeXs) {
+    ctx.fillRect(x - bridgeWidth / 2, 275 - (bridgeHeight - 50) / 2, bridgeWidth, bridgeHeight);
+  }
+
+  // Draw pockets
+   drawPockets();
+
+  // Update and draw towers
+  updateTowers();
+
+  // Update and draw units
+  for (let i = units.length - 1; i >= 0; i--) {
+    const u = units[i];
+    u.update();
+    u.draw(ctx);
+
+    if (u.hp <= 0) {
+      units.splice(i, 1);
+    }
+  }
+
+  updateSpells();
+  
+  // Draw effects
+  drawEffects()
+  
+  // Clear margin
+  ctx.fillStyle = "white";
+  ctx.fillRect(0, 600, canvas.width, 650);
+
+  // Draw timer
+  drawTimer();
+
+  // Generate elixir
+  if (frameClock % 168 == 0) {
+     generateElixir();
+  }
+  if (frameClock % 168 == 84 && frameClock >= 7200) {
+     generateElixir();
+  }
+    
+  if (frameClock % 84 == 42) {
+      if (gameMode == "AI_VS_AI") {
+          aiPlayCard("player", playerHand, playerDeck);
+      }
+      aiPlayCard("enemy", enemyHand, enemyDeck);
+  }
+  
+  // Draw elixir bar
+  drawElixirBar();
+  
+  // Draw hand 
+  ctx.fillStyle = "#ddd";
+  ctx.fillRect(0, 700, canvas.width, 150);
+  drawHand();
+
+}
+  
+  
+// Event listener
+canvas.addEventListener("click", function (e) {
+  if (!gameStarted) return;
+  if (gameMode === "AI_VS_AI") return;
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+
+  // 1️⃣ Check card clicks FIRST
+  for (let i = 0; i < handCards.length; i++) {
+    const c = handCards[i];
+
+    if (
+      mouseX >= c.x &&
+      mouseX <= c.x + c.w &&
+      mouseY >= c.y &&
+      mouseY <= c.y + c.h
+    ) {
+      selectedCardIndex = i;
+      return; // stop here
+    }
+  }
+
+  // 2️⃣ Check arena click
+  if (selectedCardIndex !== null && mouseY <= ARENA_HEIGHT) {
+    const cardId = playerHand[selectedCardIndex];
+    const card = cards[cardId];
+        
+    if (!canPlaceCard(card, mouseX, mouseY, "player")) {
+      return;
+    }
+
+    const cost = card.cost;
+    
+    if (playerElixir < cost) {
+      return;
+    }
+
+    playerElixir -= cost;
+
+      if (card.type === "spell") {
+      castSpell(card, mouseX, mouseY, "player");
+    } else if (card.name === "Knight") {
+      units.push(new Unit(mouseX, mouseY, "player", "Knight"));
+    } else if (card.name === "Valkyrie") {
+      units.push(new Unit(mouseX, mouseY, "player", "Valkyrie"));
+    } else if (card.name === "Archers") {
+      units.push(new Unit(mouseX - 15, mouseY, "player", "Archer"));
+      units.push(new Unit(mouseX + 15, mouseY, "player", "Archer"));
+    } else if (card.name === "Musketeer") {
+      units.push(new Unit(mouseX, mouseY, "player", "Musketeer"));
+    } else if (card.name === "Three Musketeers") {
+      units.push(new Unit(mouseX - 30, mouseY + 20, "player", "Baby Musketeer"));
+      units.push(new Unit(mouseX + 30, mouseY + 20, "player", "Baby Musketeer"));
+      units.push(new Unit(mouseX, mouseY - 30, "player", "Musketeer"));
+    } else if (card.name === "Giant") {
+      units.push(new Unit(mouseX, mouseY, "player", "Giant"));
+    } else if (card.name === "Minions") {
+      units.push(new Unit(mouseX - 15, mouseY + 10, "player", "Minion"));
+      units.push(new Unit(mouseX + 15, mouseY + 10, "player", "Minion"));
+      units.push(new Unit(mouseX, mouseY - 15, "player", "Minion"));
+    } else if (card.name === "Mini Pekka") {
+      units.push(new Unit(mouseX, mouseY, "player", "Mini Pekka"));
+    } else if (card.name === "Skeletons") {
+      units.push(new Unit(mouseX - 15, mouseY + 10, "player", "Skeleton"));
+      units.push(new Unit(mouseX + 15, mouseY + 10, "player", "Skeleton"));
+      units.push(new Unit(mouseX, mouseY - 15, "player", "Skeleton"));
+    } else if (card.name === "Goblins") {
+      units.push(new Unit(mouseX - 15, mouseY + 15, "player", "Goblin"));
+      units.push(new Unit(mouseX + 15, mouseY + 15, "player", "Goblin"));
+      units.push(new Unit(mouseX - 15, mouseY - 15, "player", "Goblin"));
+      units.push(new Unit(mouseX + 15, mouseY - 15, "player", "Goblin"));
+    } else if (card.name === "Spear Goblins") {
+      units.push(new Unit(mouseX - 15, mouseY + 15, "player", "Spear Goblin"));
+      units.push(new Unit(mouseX + 15, mouseY + 15, "player", "Spear Goblin"));
+      units.push(new Unit(mouseX, mouseY - 15, "player", "Spear Goblin"));
+    } else if (card.name === "Skeleton Army") {
+      units.push(new Unit(mouseX - 30, mouseY - 10, "player", "Skeleton"));
+      units.push(new Unit(mouseX - 30, mouseY + 10, "player", "Skeleton"));
+      units.push(new Unit(mouseX - 30, mouseY + 30, "player", "Skeleton"));
+      units.push(new Unit(mouseX - 20, mouseY - 30, "player", "Skeleton"));
+      units.push(new Unit(mouseX - 10, mouseY - 10, "player", "Skeleton"));
+      units.push(new Unit(mouseX - 10, mouseY + 10, "player", "Skeleton"));
+      units.push(new Unit(mouseX - 10, mouseY + 30, "player", "Skeleton"));
+      units.push(new Unit(mouseX + 0, mouseY - 30, "player", "Skeleton"));
+      units.push(new Unit(mouseX + 10, mouseY - 10, "player", "Skeleton"));
+      units.push(new Unit(mouseX + 10, mouseY + 10, "player", "Skeleton"));
+      units.push(new Unit(mouseX + 10, mouseY + 30, "player", "Skeleton"));
+      units.push(new Unit(mouseX + 20, mouseY - 30, "player", "Skeleton"));
+      units.push(new Unit(mouseX + 30, mouseY - 10, "player", "Skeleton"));
+      units.push(new Unit(mouseX + 30, mouseY + 10, "player", "Skeleton"));
+      units.push(new Unit(mouseX + 30, mouseY + 30, "player", "Skeleton"));
+    } else if (card.name === "Cannon") {
+      units.push(new Unit(mouseX, mouseY, "player", "Cannon"));
+    } else if (card.name === "Hog Rider") {
+      units.push(new Unit(mouseX, mouseY, "player", "Hog Rider"));
+    } else if (card.name === "Balloon") {
+      units.push(new Unit(mouseX, mouseY, "player", "Balloon"));
+    } else if (card.name === "Wizard") {
+      units.push(new Unit(mouseX, mouseY, "player", "Wizard"));
+    } else if (card.name === "Baby Dragon") {
+      units.push(new Unit(mouseX, mouseY, "player", "Baby Dragon"));
+    } else if (card.name === "Skeleton Dragons") {
+      units.push(new Unit(mouseX + 30, mouseY, "player", "Skeleton Dragon"));
+      units.push(new Unit(mouseX - 30, mouseY, "player", "Skeleton Dragon"));
+    } else if (card.name === "Minion Horde") {
+      units.push(new Unit(mouseX - 15, mouseY + 10, "player", "Minion"));
+      units.push(new Unit(mouseX + 15, mouseY + 10, "player", "Minion"));
+      units.push(new Unit(mouseX, mouseY + 35, "player", "Minion"));
+      units.push(new Unit(mouseX - 15, mouseY - 15, "player", "Minion"));
+      units.push(new Unit(mouseX + 15, mouseY - 15, "player", "Minion"));
+      units.push(new Unit(mouseX, mouseY - 40, "player", "Minion"));
+    } else if (card.name === "Goblin Gang") {
+      units.push(new Unit(mouseX - 15, mouseY + 10, "player", "Spear Goblin"));
+      units.push(new Unit(mouseX + 15, mouseY + 10, "player", "Spear Goblin"));
+      units.push(new Unit(mouseX, mouseY + 35, "player", "Spear Goblin"));
+      units.push(new Unit(mouseX - 15, mouseY - 15, "player", "Goblin"));
+      units.push(new Unit(mouseX + 15, mouseY - 15, "player", "Goblin"));
+      units.push(new Unit(mouseX, mouseY - 40, "player", "Goblin"));
+    } else if (card.name === "Pekka") {
+      units.push(new Unit(mouseX, mouseY, "player", "Pekka"));
+    } else if (card.name === "Fire Spirit") {
+      units.push(new Unit(mouseX, mouseY, "player", "Fire Spirit"));
+    } else if (card.name === "Witch") {
+      units.push(new Unit(mouseX, mouseY, "player", "Witch"));
+    } else if (card.name === "Tombstone") {
+      units.push(new Unit(mouseX, mouseY, "player", "Tombstone"));
+    } else if (card.name === "Barbarians") {
+      units.push(new Unit(mouseX, mouseY - 15, "player", "Barbarian"));
+      units.push(new Unit(mouseX + 15, mouseY, "player", "Barbarian"));
+      units.push(new Unit(mouseX - 15, mouseY, "player", "Barbarian"));
+      units.push(new Unit(mouseX + 10, mouseY + 15, "player", "Barbarian"));
+      units.push(new Unit(mouseX - 10, mouseY + 15, "player", "Barbarian"));
+    } else if (card.name === "Bomber") {
+      units.push(new Unit(mouseX, mouseY, "player", "Bomber"));
+    } else if (card.name === "Wallbreakers") {
+      units.push(new Unit(mouseX - 15, mouseY, "player", "Wallbreaker"));
+      units.push(new Unit(mouseX + 15, mouseY, "player", "Wallbreaker"));
+    } else if (card.name === "Bats") {
+      units.push(new Unit(mouseX - 15, mouseY + 10, "player", "Bat"));
+      units.push(new Unit(mouseX + 15, mouseY + 10, "player", "Bat"));
+      units.push(new Unit(mouseX, mouseY + 35, "player", "Bat"));
+      units.push(new Unit(mouseX - 15, mouseY - 15, "player", "Bat"));
+      units.push(new Unit(mouseX + 15, mouseY - 15, "player", "Bat"));
+    }
+    
+    cycleCard(playerHand, playerDeck, selectedCardIndex);
+    selectedCardIndex = null;
+  }
+});
+
+</script>
+
+</body>
+</html>
