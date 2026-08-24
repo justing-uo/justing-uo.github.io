@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Walnut Engine — play chess against a browser-based engine</title>
+<meta name="description" content="A negamax/alpha-beta chess engine with a transposition table, principal variation search, and quiescence search, playable right in your browser.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css"
+      integrity="sha384-q94+BZtLrkL1/ohfjR8c6L+A6qzNH9R2hBLwyoAfu3i/WCvQjzL2RQJ3uNHDISdU" crossorigin="anonymous">
+
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="frame">
+
+  <header class="masthead">
+    <div class="masthead-mark" aria-hidden="true">♞</div>
+    <div class="masthead-text">
+      <h1>Walnut Engine</h1>
+      <p class="masthead-sub">a pocket chess computer, built out of alpha&#8211;beta search &amp; committed to your browser</p>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <section class="board-column">
+      <div class="board-shell">
+        <div id="board" class="board"></div>
+      </div>
+
+      <div class="board-controls">
+        <button id="newGameBtn" class="btn btn-primary" type="button">New game</button>
+        <button id="undoBtn" class="btn" type="button">Undo move</button>
+        <button id="flipBtn" class="btn" type="button">Flip board</button>
+      </div>
+
+      <div class="setup-row">
+        <label class="field">
+          <span class="field-label">Play as</span>
+          <select id="sideSelect">
+            <option value="w">White</option>
+            <option value="b">Black</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Engine strength</span>
+          <select id="strengthSelect">
+            <option value="1">Casual</option>
+            <option value="2" selected>Club</option>
+            <option value="3">Tough</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <aside class="console-column">
+      <div class="console" aria-live="polite">
+        <div class="console-header">
+          <span class="console-light" id="consoleLight"></span>
+          <span class="console-title">Engine console</span>
+        </div>
+
+        <div class="console-status" id="consoleStatus">Waiting for your move</div>
+
+        <dl class="console-readout">
+          <div class="readout-row">
+            <dt>Depth</dt>
+            <dd id="readoutDepth">&mdash;</dd>
+          </div>
+          <div class="readout-row">
+            <dt>Nodes</dt>
+            <dd id="readoutNodes">&mdash;</dd>
+          </div>
+          <div class="readout-row">
+            <dt>Eval</dt>
+            <dd id="readoutEval">&mdash;</dd>
+          </div>
+          <div class="readout-row">
+            <dt>Time</dt>
+            <dd id="readoutTime">&mdash;</dd>
+          </div>
+        </dl>
+
+        <div class="eval-bar-track" title="Position evaluation, White's perspective">
+          <div class="eval-bar-fill" id="evalBarFill"></div>
+        </div>
+      </div>
+
+      <div class="movelist-panel">
+        <div class="movelist-title">Moves</div>
+        <ol class="movelist" id="moveList"></ol>
+      </div>
+    </aside>
+
+  </main>
+
+  <footer class="colophon">
+    Search: negamax &middot; alpha&#8211;beta &middot; principal variation search &middot; transposition table &middot; quiescence search &middot; killer &amp; history move ordering.
+    Runs entirely client-side in a Web Worker &mdash; no server, no API calls.
+  </footer>
+
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"
+        integrity="sha384-8Vi8VHwn3vjQ9eUHUxex3JSN/NFqUg3QbPyX8kWyb93+8AC/pPWTzj+nHtbC5bxD" crossorigin="anonymous"></script>
+<script src="js/main.js"></script>
+
+</body>
+</html>
