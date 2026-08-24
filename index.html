@@ -6,7 +6,7 @@
   <div id="card-pool"></div>
   <p id="deck-count">0 / 8</p>
   <button id="start-game" disabled>Start Game</button>
-  <button id="start-ai">Watch Top Game</button>
+  <button id="start-ai">Watch AI Game</button>
 </div>
 
 <div id="scoreboard">
@@ -214,11 +214,6 @@ function startGame(deck) {
 
   if (!gameStarted) {
     drawArena();
-    if (gameMode === "AI_VS_AI") {
-      for (i = 1; i < 99; i++) {
-        drawArena();
-      }
-    }
   }
 
   gameStarted = true;
