@@ -605,6 +605,7 @@
     // --- get_best_move(): iterative deepening with aspiration windows,
     // identical structure to the Python version, time-boxed.
     function findBestMove({ fen, history, maxDepth = 6, timeLimitMs = 3000 } = {}) {
+      console.log("finding best move")
       const { game, counts } = buildGameAndCounts(fen, history);
       positionCounts = counts;
 
