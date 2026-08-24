@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const PIECE_THEME = 'https://unpkg.com{piece}.png';
+  const PIECE_THEME = 'https://jsdelivr.net{piece}.png';
 
   const STRENGTH = {
     1: { maxDepth: 3, timeLimitMs: 1200, label: 'Casual' },
