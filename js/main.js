@@ -61,8 +61,7 @@
     if (move === null) return 'snapback';
 
     renderMoveList();
-    updateEvalFromGame();
-
+    
     if (game.game_over()) {
       announceGameOver();
       return;
@@ -136,21 +135,6 @@
     els.consoleStatus.textContent = isThinking ? 'Thinking…' : els.consoleStatus.textContent;
     els.undoBtn.disabled = isThinking;
     els.newGameBtn.disabled = isThinking;
-  }
-
-  function updateEvalFromGame() {
-    // Lightweight material-only estimate for the eval bar between engine
-    // replies (keeps the bar responsive to the human's own moves too).
-    const values = { p: 100, n: 305, b: 333, r: 563, q: 950, k: 0 };
-    let total = 0;
-    const boardArr = game.board();
-    for (const row of boardArr) {
-      for (const cell of row) {
-        if (!cell) continue;
-        total += (cell.color === 'w' ? 1 : -1) * (values[cell.type] || 0);
-      }
-    }
-    paintEvalBar(total);
   }
 
   function paintEvalBar(whiteCentipawns) {
@@ -244,7 +228,6 @@
     }
     board.position(game.fen());
     renderMoveList();
-    updateEvalFromGame();
     els.consoleStatus.textContent = game.turn() === humanColor ? 'Your move' : 'Thinking…';
   });
 
