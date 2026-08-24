@@ -1,15 +1,12 @@
 (function () {
   'use strict';
 
-  const PIECE_THEME = 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png';
+  const PIECE_THEME = 'https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/img/chesspieces/wikipedia/{piece}.png';
 
   const STRENGTH = {
-    1: { maxDepth: 1, timeLimitMs: 3600000, label: 'Level 1' },
-    2: { maxDepth: 2, timeLimitMs: 3600000, label: 'Level 2' },
-    3: { maxDepth: 3, timeLimitMs: 3600000, label: 'Level 3' },
-    4: { maxDepth: 4, timeLimitMs: 3600000, label: 'Level 4' },
-    5: { maxDepth: 5, timeLimitMs: 3600000, label: 'Level 5' },
-    6: { maxDepth: 6, timeLimitMs: 3600000, label: 'Level 6' },
+    1: { maxDepth: 3, timeLimitMs: 1200, label: 'Casual' },
+    2: { maxDepth: 5, timeLimitMs: 3000, label: 'Club' },
+    3: { maxDepth: 7, timeLimitMs: 6000, label: 'Tough' },
   };
 
   const game = new Chess();
@@ -61,6 +58,7 @@
     if (move === null) return 'snapback';
 
     renderMoveList();
+    updateEvalFromGame();
 
     if (game.game_over()) {
       announceGameOver();
@@ -135,6 +133,21 @@
     els.consoleStatus.textContent = isThinking ? 'Thinking…' : els.consoleStatus.textContent;
     els.undoBtn.disabled = isThinking;
     els.newGameBtn.disabled = isThinking;
+  }
+
+  function updateEvalFromGame() {
+    // Lightweight material-only estimate for the eval bar between engine
+    // replies (keeps the bar responsive to the human's own moves too).
+    const values = { p: 100, n: 305, b: 333, r: 563, q: 950, k: 0 };
+    let total = 0;
+    const boardArr = game.board();
+    for (const row of boardArr) {
+      for (const cell of row) {
+        if (!cell) continue;
+        total += (cell.color === 'w' ? 1 : -1) * (values[cell.type] || 0);
+      }
+    }
+    paintEvalBar(total);
   }
 
   function paintEvalBar(whiteCentipawns) {
@@ -228,6 +241,7 @@
     }
     board.position(game.fen());
     renderMoveList();
+    updateEvalFromGame();
     els.consoleStatus.textContent = game.turn() === humanColor ? 'Your move' : 'Thinking…';
   });
 
