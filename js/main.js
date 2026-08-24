@@ -77,6 +77,7 @@
 
   // ------------------------------------------------------------- engine IO
   function requestEngineMove() {
+    console.log("Requesting Engine Move");
     engineThinking = true;
     requestSeq += 1;
     const myRequestId = requestSeq;
