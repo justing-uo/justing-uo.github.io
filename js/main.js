@@ -4,9 +4,12 @@
   const PIECE_THEME = 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png';
 
   const STRENGTH = {
-    1: { maxDepth: 3, timeLimitMs: 1200, label: 'Casual' },
-    2: { maxDepth: 5, timeLimitMs: 3000, label: 'Club' },
-    3: { maxDepth: 7, timeLimitMs: 6000, label: 'Tough' },
+    1: { maxDepth: 1, timeLimitMs: 60000, label: 'Level 1' },
+    2: { maxDepth: 2, timeLimitMs: 60000, label: 'Level 2' },
+    3: { maxDepth: 3, timeLimitMs: 60000, label: 'Level 3' },
+    4: { maxDepth: 4, timeLimitMs: 60000, label: 'Level 4' },
+    5: { maxDepth: 5, timeLimitMs: 60000, label: 'Level 5' },
+    6: { maxDepth: 6, timeLimitMs: 60000, label: 'Level 6' },
   };
 
   const game = new Chess();
