@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const PIECE_THEME = 'https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/img/chesspieces/wikipedia/{piece}.png';
+  const PIECE_THEME = 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png';
 
   const STRENGTH = {
     1: { maxDepth: 1, timeLimitMs: 3600000, label: 'Level 1' },
@@ -61,7 +61,6 @@
     if (move === null) return 'snapback';
 
     renderMoveList();
-    updateEvalFromGame();
 
     if (game.game_over()) {
       announceGameOver();
@@ -77,7 +76,6 @@
 
   // ------------------------------------------------------------- engine IO
   function requestEngineMove() {
-    console.log("Requesting Engine Move");
     engineThinking = true;
     requestSeq += 1;
     const myRequestId = requestSeq;
@@ -85,10 +83,7 @@
 
     const strength = STRENGTH[els.strengthSelect.value];
     worker.postMessage({
-      // Full SAN history, not just the current FEN -- the engine replays
-      // it to reconstruct true position-repetition counts across the
-      // whole game (needed for its 2-fold/3-fold repetition handling).
-      history: game.history(),
+      fen: game.fen(),
       maxDepth: strength.maxDepth,
       timeLimitMs: strength.timeLimitMs,
       requestId: myRequestId,
@@ -140,12 +135,6 @@
     els.consoleStatus.textContent = isThinking ? 'Thinking…' : els.consoleStatus.textContent;
     els.undoBtn.disabled = isThinking;
     els.newGameBtn.disabled = isThinking;
-  }
-
-  function updateEvalFromGame() {
-    // Same material+PST evaluation the engine itself uses (White's
-    // perspective), so the bar is consistent before the engine has replied.
-    paintEvalBar(ChessEngine.evaluate(game));
   }
 
   function paintEvalBar(whiteCentipawns) {
@@ -239,7 +228,6 @@
     }
     board.position(game.fen());
     renderMoveList();
-    updateEvalFromGame();
     els.consoleStatus.textContent = game.turn() === humanColor ? 'Your move' : 'Thinking…';
   });
 
